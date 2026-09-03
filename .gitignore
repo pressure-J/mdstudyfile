@@ -7,3 +7,6 @@
 
 # ===== 空草稿 =====
 web/Untitled.md
+
+# ===== 知识库派生数据（由 build_chunks.py 生成，不入库；脚本本身入库）=====
+kb/*.json
