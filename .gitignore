@@ -12,3 +12,6 @@ web/Untitled.md
 kb/*.json
 kb/*.npy
 kb/__pycache__/
+# ===== CTF 备赛/求职材料：仅本地 =====
+CTF备赛/
+
