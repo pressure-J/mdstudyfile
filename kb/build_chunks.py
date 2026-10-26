@@ -6,7 +6,7 @@
   1. 按 Markdown 标题（# ~ ####）切块，标题作为块的 heading
   2. 超长块（> MAX_CHUNK 字符）按空行分段切小
   3. 剥离 YAML frontmatter
-排除目录：.git / 漏洞复现 / 应急响应杂项 / kb（与 .gitignore 一致）
+排除目录：.git / 漏洞复现 / 安全运营 / kb（与 .gitignore 一致）
 """
 import json
 import pathlib
@@ -15,7 +15,7 @@ import re
 ROOT = pathlib.Path(r'D:\mdstudyfile')
 KB = ROOT / 'kb'
 OUT = KB / 'chunks.json'
-EXCLUDE_DIRS = {'.git', '漏洞复现', '应急响应杂项', 'kb'}
+EXCLUDE_DIRS = {'.git', '漏洞复现', '安全运营', 'kb'}
 EXCLUDE_FILES = {'web/Untitled.md'}  # 空草稿，与 .gitignore 一致
 MAX_CHUNK = 800
 

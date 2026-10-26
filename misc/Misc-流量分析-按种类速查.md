@@ -133,7 +133,7 @@ aa=@eval(base64_decode($_POST[action]));     ← 固定外壳
 
 **处理流程**：先导出木马文件本身（`Export Objects`）→ 读源码拿密码/密钥 → 写脚本把每个请求体 base64 解一层 → AES 解密 → 前 2 字节是 `1f 8b` 则 gzip 解压 → 得到明文命令。
 
-> 典型实战见 `应急响应杂项\03-流量分析\Webshell上传与加密隧道分析WriteUp.md`（XOR + Base64 + gzip 三层，密钥 `3c6e0b8a9c15224a`）。
+> 典型实战见 `安全运营\01-应急响应\03-流量分析\Webshell上传与加密隧道分析WriteUp.md`（XOR + Base64 + gzip 三层，密钥 `3c6e0b8a9c15224a`）。
 
 ### 1.4 加密隧道（无回显特征）
 
