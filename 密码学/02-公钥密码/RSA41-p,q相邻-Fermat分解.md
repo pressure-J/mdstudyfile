@@ -1,6 +1,6 @@
 ---
 tags: [crypto]
-title: 素数分解
+title: RSA41-p,q相邻-Fermat分解
 created: '2025-10-26T08:24:36.356Z'
 modified: '2026-09-16T12:30:00.000Z'
 ---

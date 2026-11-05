@@ -1,12 +1,20 @@
 # 密码学笔记索引
 
-> 最后更新: 2026-10-26 | 共 41 篇笔记 + 18 个脚本（常用函数 1 / 01-基础密码 12+4 / 02-RSA(02-公钥密码) 12+8 / 03-流密码(03-对称密码) 7+0 / 04-哈希与消息认证 1+0 / 05-国密 5+4 / 06-其他 3+1）
+> 最后更新: 2026-11-04 | 共 53 篇笔记 + 25 个脚本（工具层 2 / 01-基础密码 12+4 / 02-公钥密码 19+16（含 .sage）/ 03-对称密码 8+0 / 05-国密 5+4 / 06-其他 4+1 / 07-协议与流量 1+0；`04-密码协议/` 目前为空目录待补）。根目录另有 `Untitled.md` 草稿，未计入
 
 ## 常用函数（工具层，不懂函数怎么调就先看这篇）
 
 | 笔记 | 说明 |
 |------|------|
 | [常用函数](常用函数.md) | **密码学函数库速查**：Python 内置 `int`（三参 `pow`/模逆/bytes 互转）· `Crypto.Util.number` · `Crypto.Cipher`(AES 五模式/填充) · `Crypto.PublicKey.RSA`(construct/导入导出) · `gmpy2`(提速实测 9×) · `sympy`(crt 与 discrete_log 的参数序大坑) · `gmssl`(SM2 的 mode/asn1、SM4 填充) · 标准库 · OpenSSL/gpg 命令行。含**按题目特征秒查表**与**18 条实测踩坑清单** |
+
+## 网络发包与靶机交互（工具层）
+
+> 靶机题的收发骨架。看到「给 IP:端口 + 让算完发回」就先翻这篇。
+
+| 笔记 | 说明 |
+|------|------|
+| [网络发包与socket](网络发包与socket.md) | **靶机交互怎么用代码写**：TCP 是字节流不是消息（`recv(n)` 语义是「最多 n 字节」）、三种定帧方案 ↔ `recvuntil`/`recvn`/`sendlineafter` 对应表、`p32`/`u32` **默认小端**的坑（16 被读成 268435456 → `recvn` 死等）、`listen()` 幽灵连接空转、假靶机模拟器（`socketserver` 起，文本挑战应答 + 二进制帧两模式）、实测输出、换真题只改三处。**收发直接用 pwntools，不自己写 socket 封装**。配套脚本 `D:/python/CTF工具箱/net/`（00-本地靶机模拟器.py / 01-发包模板-核心收发.py，需 pwntools 4.15） |
 
 ## 01-基础密码
 
@@ -30,32 +38,46 @@
 
 ## 02-公钥密码（RSA）
 
-> 主入口先看 [RSA](02-公钥密码/RSA.md)（原理与安全根基），再按题面特征对号入座下表。
+> 主入口先看 [RSA00-攻击决策树](02-公钥密码/RSA00-攻击决策树.md) 做路由，原理看 [RSA原理](02-公钥密码/RSA原理.md)。
 
 | 笔记 | 触发特征（看到就用） |
 |------|----------------------|
-| [RSA](02-公钥密码/RSA.md) | 总纲：密钥生成 5 步、加解密推导、为什么 d/e/pq 都要这样取 |
-| [素数分解](02-公钥密码/素数分解.md) | 小素数 sympy 直接分解 / `nextprime` 造题 → Fermat 秒破 |
-| [RSA共模攻击](02-公钥密码/RSA共模攻击.md) | 同一 n、同一 m、两组不同 (e, c) → 扩展欧几里得凑出 m |
-| [RSA低指数广播攻击](02-公钥密码/RSA低指数广播攻击.md) | 多组 n 同一 e（如 e=3）同一明文 → CRT 合并后开 e 次方 |
-| [RSA共素数-gcd分解](02-公钥密码/RSA共素数-gcd分解.md) | 多组 (n, c)、e 固定 → 两两 `gcd` 秒出共享素数 |
-| [RSA共素数-PollardRho变体](02-公钥密码/RSA共素数-PollardRho变体.md) | p−1、q−1 共享大因子，gcd 退化为合数时用 rho 变体 |
-| [RSA-Wiener攻击](02-公钥密码/RSA-Wiener攻击.md) | e 极大、d 很小 → 连分数逼近 e/n 解出 d |
-| [RSA-dp泄露家族](02-公钥密码/RSA-dp泄露家族.md) | 给了 dp（或 dp+dq）→ CRT 合并 / 爆破 k 试除 n |
-| [RSA-p减1光滑-Pollardp-1](02-公钥密码/RSA-p减1光滑-Pollardp-1.md) | 素数由「小素数连乘 +1」构造 → p−1 光滑，Pollard p−1 |
-| [RSA-Coppersmith高位攻击](02-公钥密码/RSA-Coppersmith高位攻击.md) | 明文/因子高位已知（d 部分泄露、p 高位泄露）→ 格上小根 |
-| [RSA-构造A反推参数](02-公钥密码/RSA-构造A反推参数.md) | 给含 x/y/z 幂的大整数公式 A + n + c → 反推参数再分解 n |
-| [RSA-e与phi不互素-开高次根](02-公钥密码/RSA-e与phi不互素-开高次根.md) | e = 2 的幂（1024/2048）+ `pow(e,-1,phi)` 报 not invertible → gcd(e,φ)≠1，模 p/q 各开根再 CRT 出 g_p×g_q 个候选 |
+| [RSA00-攻击决策树](02-公钥密码/RSA00-攻击决策树.md) | **题面 → 攻击的路由表**：起手三件零成本事；多组 n / e·d 异常 / dp·d·φ·部分位泄漏 / n 结构（相邻、光滑、p+1、可预测）；含判定顺序与补齐状态。**做题先查这页** |
+| [RSA原理](02-公钥密码/RSA原理.md) | 总纲：密钥生成 5 步、加解密推导、为什么 d/e/p/q 都要这样取 |
+| [RSA11-共素数-gcd分解](02-公钥密码/RSA11-共素数-gcd分解.md) | 多组 (n, c)、e 固定 → 两两 `gcd` 秒出共享素数 |
+| [RSA12-共素数-PollardRho变体](02-公钥密码/RSA12-共素数-PollardRho变体.md) | p−1、q−1 共享大因子，gcd 退化为合数时用 rho 变体 |
+| [RSA13-共模攻击](02-公钥密码/RSA13-共模攻击.md) | 同一 n、同一 m、两组不同 (e, c) → 扩展欧几里得凑出 m |
+| [RSA14-低指数广播攻击](02-公钥密码/RSA14-低指数广播攻击.md) | 多组 n 同一 e（如 e=3）同一明文 → CRT 合并后开 e 次方 |
+| [RSA15-相关消息-FranklinReiter](02-公钥密码/RSA15-相关消息-FranklinReiter.md) | 同 n 同 e、`m2 = a·m1 + b` → `Z_n[x]` 上多项式 gcd 直接出 m1 |
+| [RSA21-Wiener攻击](02-公钥密码/RSA21-Wiener攻击.md) | e 极大、d 很小 → 连分数逼近 e/n；第八节附 Boneh-Durfee 的 0.292 边界 |
+| [RSA22-e与phi不互素-开高次根](02-公钥密码/RSA22-e与phi不互素-开高次根.md) | e = 2 的幂 + `pow(e,-1,phi)` 报 not invertible → 模 p/q 各开根再 CRT |
+| [RSA23-Coppersmith高位攻击](02-公钥密码/RSA23-Coppersmith高位攻击.md) | p 高位/低位已知 → 格上小根；**附一**明文高位（低指数+已知前缀）、**附二**PKE 的 δ≥n/4 边界 |
+| [RSA31-dp泄露家族](02-公钥密码/RSA31-dp泄露家族.md) | 给了 dp（或 dp+dq）→ 爆破 k 试除 n |
+| [RSA32-构造A反推参数](02-公钥密码/RSA32-构造A反推参数.md) | 给含 x/y/z 幂的大整数公式 A + n + c → 反推参数再分解 |
+| [RSA33-d与phi泄露](02-公钥密码/RSA33-d与phi泄露.md) | 给完整 d 或 φ → φ 一步二次方程；d 走 `ed−1 = 2ˢ·r` 平方链概率分解 |
+| [RSA34-已知和差异或](02-公钥密码/RSA34-已知和差异或.md) | 给 p+q / p−q → 韦达；给 p⊕q → 低位逐位 DFS（1024 位 n 约 1.3s） |
+| [RSA41-p,q相邻-Fermat分解](02-公钥密码/RSA41-p,q相邻-Fermat分解.md) | `nextprime` 造题 / p、q 相邻 → Fermat 平方差秒破 |
+| [RSA42-p减1光滑-Pollardp-1](02-公钥密码/RSA42-p减1光滑-Pollardp-1.md) | 素数由「小素数连乘 +1」构造 → p−1 光滑，Pollard p−1 |
+| [RSA43-p加1光滑-Williamsp+1](02-公钥密码/RSA43-p加1光滑-Williamsp+1.md) | p−1 光滑跑不动但 p 由小素数连乘 −1 → Williams p+1；**基必须含随机大数** |
+| [RSA44-随机数缺陷-可预测素数](02-公钥密码/RSA44-随机数缺陷-可预测素数.md) | 生成脚本里有 `random.seed(time())` / 固定种子 → 按窗口爆种子复现 p |
+| [RSA-CommonPrime-CPRSA](02-公钥密码/RSA-CommonPrime-CPRSA.md) | p−1、q−1 共享大素数 g（φ 实际是 λ）→ Jochemsz-May 多元格 |
 
 | 脚本 | 依赖 | 用途 |
 |------|------|------|
+| `RSA15-相关消息-FranklinReiter-solve.py` | py 直跑 | 相关消息多项式 gcd |
+| `RSA33-d与phi泄露-solve.py` | py 直跑 | φ 二次方程 + d 平方链分解 |
+| `RSA34-已知和差异或-solve.py` | py 直跑 | p+q / p−q / p⊕q 三种 |
+| `RSA43-p加1光滑-Williamsp+1-solve.py` | py 直跑 | Williams p+1（含随机基） |
+| `RSA44-随机数缺陷-可预测素数-solve.py` | py 直跑 | 时间戳种子窗口爆破 |
+| `RSA23-Coppersmith明文高位-solve.sage` | **SageMath** | 低指数 + 已知前缀求小根 |
+| `RSA-Coppersmith高位攻击-solve.py` | **SageMath** | p 高位/低位，需 `small_roots` |
+| `RSA-CommonPrime-CPRSA-solve.sage` | **SageMath** | Jochemsz-May 格 |
 | `RSA共模攻击-solve.py` | py 直跑 | 共模攻击 |
 | `RSA共素数-rho变体-solve.py` | py 直跑 | 共享因子 rho 变体 |
 | `RSA-Wiener攻击-solve.py` | 纯 Python | Wiener 连分数 |
 | `RSA-dp泄露-solve.py` / `RSA-dp_dq泄露-solve.py` | py 直跑 | dp / dp+dq 两种变体 |
 | `RSA-p减1光滑-Pollardp-1-solve.py` | py 直跑 | Pollard p−1 |
-| `RSA-Coppersmith高位攻击-solve.py` | **SageMath** | 需 `small_roots`，普通 Python 无此函数 |
-| `RSA-e与phi不互素-开高次根-solve.py` | py 直跑（gmpy2） | 费马分解 + 逐层开平方 + CRT 四候选 |
+| `RSA-e与phi不互素-开高次根-solve.py` | py 直跑（gmpy2） | 费马分解 + 逐层开平方 + CRT |
 
 ## 03-对称密码（流密码）
 
@@ -65,10 +87,12 @@
 | [LFSR状态恢复](03-对称密码/LFSR状态恢复.md) | 给 LFSR 加密脚本 + 输出文件求种子 → 输出位即移入位，连续 N 位 = N 步后状态，逆推得初态 |
 | [FCSR线性化攻击-F-FCSR状态恢复](03-对称密码/FCSR线性化攻击-F-FCSR状态恢复.md) | 给**滤波式 FCSR/F-FCSR** 脚本（`clock` 里 `C &= state` 这种两支 AND）+ 超大密钥流（2²⁴~2²⁶ 字节）→ 扫"C 恒定单比特"事件把进位冻成常数 → 8×20 线性方程组解主寄存器 |
 | [循环异或-已知明文前缀推密钥周期](03-对称密码/循环异或-已知明文前缀推密钥周期-WriteUp.md) | 外层标准 Base64 + 明文有**固定前缀**（如 `CTF2{`）+ 密钥宽度 < 8 → 前缀异或直接反推密钥周期 |
+| [加密文件-已知明文破译通用流程](03-对称密码/加密文件-已知明文破译通用流程.md) | **docx/png/pdf 整个文件被加密、打开报错、hex 全乱** → 明文魔数表（20 条实测头，含文件尾标记）+ 5 种模型判别表（重复片段距离 gcd / 16 对齐 / 有无重复）+ 四步流程 + `33-加密文件-已知明文反推单字节变换.py`；**验证只认 CRC** |
 
 | 脚本 | 依赖 | 用途 |
 |------|------|------|
 | `23-FCSR线性化攻击.py` | py 直跑（numpy 可选） | FCSR 事件扫描 + 状态恢复 + 解密；64MB 需 `D:\python\CTF工具箱\crypto\fcsr_c\` 的 C 加速版 |
+| `33-加密文件-已知明文反推单字节变换.py` | py 直跑 | 加密文件模型判别（重复片段/gcd/16 对齐）+ 已知明文拟合 `c=ROL(p,k)^b` 或 `+b` + 自动打分（魔数/可打印率/zip CRC） |
 
 > LFSR 状态恢复见 `D:\python\CTF工具箱\`；流密码密钥重用逻辑两行，见笔记内代码
 
@@ -76,7 +100,7 @@
 
 | 笔记 | 触发特征（看到就用） |
 |------|----------------------|
-| [消息认证-MAC攻击与长度扩展](04-哈希与消息认证/消息认证-MAC攻击与长度扩展.md) | 截断 tag/签名只有部分 hex 位 → 生日碰撞调包（2^(n/2)）；CBC-MAC 变长消息 → 拼接 `A‖(B⊕tagA)`；`sig = Hash(SECRET‖data)` 要伪造 → 长度扩展（md_pad 两次 + 爆破 SECRET 长度 0..63，SM3/SHA-256 同款）。含 MD 五站骨架手搓对拍与三题复盘 |
+| [消息认证-MAC攻击与长度扩展](06-其他/消息认证-MAC攻击与长度扩展.md) | 截断 tag/签名只有部分 hex 位 → 生日碰撞调包（2^(n/2)）；CBC-MAC 变长消息 → 拼接 `A‖(B⊕tagA)`；`sig = Hash(SECRET‖data)` 要伪造 → 长度扩展（md_pad 两次 + 爆破 SECRET 长度 0..63，SM3/SHA-256 同款）。含 MD 五站骨架手搓对拍与三题复盘 |
 
 ## 05-国密
 

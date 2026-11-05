@@ -1,0 +1,142 @@
+# -*- coding: utf-8 -*-
+# ============================================================================
+# 30-RSA-CommonPrime-JochemszMay.sage      【Sage 脚本，不能用 py 跑】
+#
+# 触发特征(看到就用): e 的位数明显小于 n（本例 n 1025 位、e 703 位），出题脚本形如
+#       def gen(g):
+#           bits = 512 - g.bit_length()
+#           a = getPrime(bits);  p = 2*a*g + 1 ; if isPrime(p): return p
+#       g = getPrime(320);  p, q = gen(g), gen(g)          # p-1、q-1 共用同一个大素数 g
+#       d = getPrime(135);  phi = lcm(p-1, q-1);  e = inverse(d, phi)
+#   即 Common Prime RSA（小 d + p-1、q-1 共享 g > n^0.25）。
+#   典型误判: 看到 d 小就套 Wiener（连分数）—— 这里必然失败，原因见
+#   D:\mdstudyfile\密码学\02-公钥密码\RSA-CommonPrime-CPRSA.md 第三节。
+#
+# 原理: ed = k(2gab) + 1 = k(p-1)b + 1 = ka(q-1) + 1
+#       后两式相乘 → f(x,y,z) = e^2 x^2 + e x (y+z-2) - (n-1) y z - (y+z-1)
+#       以 x=d, y=p-1, z=q-1 为根。Jochemsz–May (Asiacrypt 2006) 用 x-shift 造格,
+#       LLL 出两个短向量, 与 f 求结式消元回代出 d, ka, kb → g=(ed-1)/(2kab)
+#       → p = 2ga+1, q = 2gb+1。
+#
+# 用法: 改下面 n / e / c 三行 → 用 Windows 的 Sage 启动器跑（不能 py 直接跑 .sage）:
+#       "C:\Users\<你>\AppData\Local\SageMath 9.3\runtime\bin\bash.exe" -lc "/opt/sagemath-9.3/sage /cygdrive/d/python/CTF工具箱/crypto/30-RSA-CommonPrime-JochemszMay.sage"
+#       (单次约 70 秒；路径含中文没问题，整段加引号即可)
+#
+# 离线可用: 需要 SageMath（LLL + 多元多项式结式），普通 py + pycryptodome 做不到。
+#           参数 gamma/delta/m 按题目规模改: gamma = g位数/n位数, delta = d位数/n位数。
+# ============================================================================
+
+# ============================ 换题只改这三行 ============================
+n = 253784908428481171520644795825628119823506176672683456544539675613895749357067944465796492899363087465652749951069021248729871498716450122759675266109104893465718371075137027806815473672093804600537277140261127375373193053173163711234309619016940818893190549811778822641165586070952778825226669497115448984409
+e = 31406775715899560162787869974700016947595840438708247549520794775013609818293759112173738791912355029131497095419469938722402909767606953171285102663874040755958087885460234337741136082351825063419747360169129165
+c = 97724073843199563126299138557100062208119309614175354104566795999878855851589393774478499956448658027850289531621583268783154684298592331328032682316868391120285515076911892737051842116394165423670275422243894220422196193336551382986699759756232962573336291032572968060586136317901595414796229127047082707519
+# ========================================================================
+
+# ---------- 规模参数：gamma = g 位宽/n 位宽，delta = d 位宽/n 位宽 ----------
+gamma = 320 / 1024          # g 是 320 位
+delta = 135 / 1024          # d 是 135 位
+m = 2                       # 层的阶数（m=2 对本例够用，45 维格）
+tau = (1 / 2 + gamma - 4 * delta) / (2 * delta)
+t = ZZ(floor(tau * m))
+
+X = ZZ(floor(n ^ delta))
+Y = ZZ(floor(n ^ (delta + 1 / 2 - gamma)))
+Z = ZZ(floor(n ^ (delta + 1 / 2 - gamma)))
+W = ZZ(floor(n ^ (2 + 2 * delta - 2 * gamma)))
+R = W * X ^ (2 * (m - 1) + t) * (Y * Z) ^ (m - 1)
+
+P = PolynomialRing(ZZ, 'x,y,z')
+x, y, z = P.gens()
+
+# 根: x = d, y = p-1, z = q-1
+f = e^2 * x^2 + e * x * (y + z - 2) - (n - 1) * y * z - (y + z - 1)
+assert f.constant_coefficient() == 1
+
+# ---------- Jochemsz–May 的单项式集合 ----------
+M = set()
+S = set()
+for i3 in range(0, m):
+    for i2 in range(0, m):
+        for i1 in range(0, 2 * (m - 1) - (i2 + i3) + t + 1):
+            S.add(x ^ i1 * y ^ i2 * z ^ i3)
+for i3 in range(0, m + 1):
+    for i2 in range(0, m + 1):
+        for i1 in range(0, 2 * m - (i2 + i3) + t + 1):
+            M.add(x ^ i1 * y ^ i2 * z ^ i3)
+M_S = sorted(M - S)
+S = sorted(S)
+M = sorted(M)
+
+# ---------- 造 x-shift 移位多项式（三角化基） ----------
+g = {}
+ff = f.change_ring(Zmod(R)).change_ring(ZZ)
+for mono in S:
+    i1, i2, i3 = mono.degree(x), mono.degree(y), mono.degree(z)
+    fn = mono * ff(x, y, z) * X ^ (2 * (m - 1) + t - i1) * Y ^ (m - 1 - i2) * Z ^ (m - 1 - i3)
+    g[mono] = expand(fn(x * X, y * Y, z * Z))
+for mono in M_S:
+    fn = R * mono
+    g[mono] = expand(fn(x * X, y * Y, z * Z))
+
+npolys = len(g)
+nmonos = len(M)
+print("polynomials: {}, monomials: {}".format(npolys, nmonos))
+assert npolys == nmonos
+
+B = Matrix(ZZ, npolys, nmonos)
+for row, mono in enumerate(M):
+    for cff, mono_ in g[mono]:
+        B[row, M.index(mono_)] = cff
+
+print("LLL...")
+BB = B.LLL(algorithm='fpLLL:proved', fp='rr')
+
+def topoly(r):
+    RR = PolynomialRing(QQ, 'x,y,z')
+    pol = 0
+    for col in range(nmonos):
+        pol += r[col] * M[col]
+    pol = RR(pol(x / X, y / Y, z / Z))
+    for cf, _ in pol:
+        assert cf.is_integer()
+    return P(pol)
+
+hv = [expand(topoly(r)) for r in BB]
+h1, h2 = hv[0:2]
+
+s, = PolynomialRing(ZZ, 's').gens()
+h1x = h1.resultant(f, z)
+h2x = h2.resultant(f, z)
+hh = h1.resultant(h2, z)
+hy = h1x.resultant(h2x, y)
+
+# 结式消元回代：先出 d，再出 ka、kb
+d = [r for r, _ in hy(x=s).roots() if r != 0]
+assert len(d) == 1
+d = ZZ(d[0])
+
+ka = [r for r, _ in hh(x=d, y=s).roots() if r != 0]
+assert len(ka) == 2           # f 对 y、z 对称，两个解互为 p-1/q-1
+ka = ZZ(ka[0])
+
+kb = [r for r, _ in f(x=d, y=ka, z=s).roots() if r != 0]
+assert len(kb) == 1
+kb = ZZ(kb[0])
+
+print("found d  = {}".format(d))
+print("found ka = {}".format(ka))
+print("found kb = {}".format(kb))
+
+k = gcd(ka, kb)
+a = ka // k
+b = kb // k
+g = (e * d - 1) // (2 * k * a * b)
+p = 2 * g * a + 1
+q = 2 * g * b + 1
+assert p * q == n
+
+print("p = {}\nq = {}".format(p, q))
+m_int = Integer(pow(c, d, n))
+h = format(m_int, "x")
+h = "0" * (len(h) % 2) + h
+print("flag = " + bytes.fromhex(h).decode())

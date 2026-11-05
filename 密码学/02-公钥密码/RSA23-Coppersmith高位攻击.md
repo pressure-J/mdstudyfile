@@ -2,7 +2,7 @@
 tags: [crypto]
 title: RSA-Coppersmith高位攻击
 created: '2026-09-16T12:00:00.000Z'
-modified: '2026-09-16T12:00:00.000Z'
+modified: '2026-11-03T13:10:00.000Z'
 ---
 
 # RSA — Coppersmith 部分密钥泄露（高位 / 低位攻击）
@@ -111,4 +111,57 @@ for i in range(2 ** 5):                        # 爆破低 5 位
 - **Q: 未知位只比上限多几位时怎么处理？** A: 直接爆破多出的那几位（枚举），把未知位压到上限内再跑 Coppersmith。
 - **Q: Coppersmith 的数学工具是什么？** A: Howgrave-Graham 构造的格 + LLL 格基约化，找到系数足够小的多项式使小根成为整数根。
 
-*最后更新：2026年9月16日*
+
+## 附一：明文高位（stereotyped message）
+
+### 题型识别
+`e` 很小（3/5）、明文有**已知前缀**（`flag{`、固定 padding、已知的部分内容），只给 `n`、`e`、`c`。
+判据：**未知位数 < `n^(1/e)`**（e=3、n 1024 位 → 约 341 位）。
+
+### 原理
+设 `m = known·2^k + x`（x 是未知低位），则 x 是
+
+$$f(x) = (known \cdot 2^k + x)^e - c \equiv 0 \pmod n$$
+
+的小根，`|x| < 2^k < n^(1/e)`，直接 `small_roots(X=2^k, beta=1.0)`。
+
+**与正文的区别**：正文攻击的是**因子 p 的位**（`beta≈0.4`、上限约 0.44·p_bits）；这里攻击的是**明文本身**（`beta=1.0`、上限 n^(1/e)）。两者都是 Coppersmith，但 beta 和 X 完全不同，别混。
+
+### 代码
+
+```python
+R = Zmod(n); PR.<x> = PolynomialRing(R)
+f = (known * 2**shift + x)**e - c
+roots = f.monic().small_roots(X=2**shift, beta=1.0)
+m = Integer(roots[0]) + known * 2**shift
+```
+
+### 易错点
+1. `beta=1.0`（攻击整模数），不是正文的 0.4。
+2. 未知位超 `n^(1/e)` 一点就爆破（同正文第 2 条）。
+3. 前缀要精确到字节：`flag{` 是 5 字节 = 40 位，`known` 必须按位对齐，差一位就无解。
+4. 脚本：同目录 `RSA23-Coppersmith明文高位-solve.sage`（必须 SageMath 跑）。
+
+### 验证记录（2026-11-03）
+- 模拟：n 1024 位、e=3、明文 335 位、未知低 64 位
+- `small_roots` 一次命中，恢复 `flag{stereotyped_message_coppersmith_2026}`；含 Sage 启动全程 36.5s
+
+## 附二：d 的部分位（Partial Key Exposure）
+
+### 题型识别
+给了 `d` 的低（或高）若干位，如 `d & ((1<<256)-1)`，其余不给。
+
+### 边界（记住，别硬上）
+- `ed − 1 = k·φ(n)`，`k ∈ [1, e)`；
+- Boneh-Durfee-Frankel：已知 d 的低 **δ ≥ n_bits/4** 位即可分解 n（专门构造的二元格）；
+- `δ < n/4` 不保证可行。
+
+### 工程做法（思路）
+1. 爆破 k（e 小时只有几个候选）。
+2. 由 `e·d_low − 1 ≡ k·φ (mod 2^δ)` 反解 `s = p+q` 的低 δ 位（k 为奇时模 2^δ 可逆）。
+3. 在模 2^δ 下解 `p² − s·p + n ≡ 0`，逐位 Hensel 提升得到 p 的低 δ 位。
+4. δ 足够大（接近 p_bits 的一半）时可退化成"已知 p 低位"，用本文类型②的一元 Coppersmith 收复；**δ = n/4 时未知位超过一元上限，必须上二元格**。
+
+> **状态：本条只有方法与边界，没有可跑脚本。** 完整 PKE 需要 Boneh-Durfee 的二元格构造，属于既定路线里"遇到就跳"的一类——认得题面、说得出 0.25/0.292/n4 这几个界就够了。
+
+*最后更新：2026年11月3日*
